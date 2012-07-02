@@ -70,21 +70,26 @@ sub main {
     my $ls_not_lb = 0;
     
     if ($ls_status || $lb_status) {
-		# At least one of the API calls succeeded
+        # At least one of the API calls succeeded
+        my $building = $lb_data->{building};
         $ls_not_lb = 1 if ($ls_data->{number} != $lb_data->{number});
         my $dur_sec;
         my $dur_human;
         if ($ls_status) {
             ($dur_sec, $dur_human) = calcdur(int($ls_data->{timestamp} / 1000));
-            if ($dur_sec >= $thresh_crit && $thresh_crit) {
-                response("CRITICAL", "'$jobname' has not run successfully for $dur_human. " . ($ls_not_lb ? "Runs since failed. " : "No runs since. ") . $lb_data->{url} );
-            } elsif ($dur_sec >= $thresh_warn && $thresh_warn && $ls_not_lb) {
+            if ($dur_sec >= $thresh_crit && $thresh_crit && $ls_not_lb) {
+                response("CRITICAL", "'$jobname' has not run successfully for $dur_human. " . ($building ? "Job currently running. " : "Runs since failed. ") . $lb_data->{url} );
+            } elsif ($dur_sec >= $thresh_crit && $thresh_crit && !$ls_not_lb) {
+                response("CRITICAL", "'$jobname' has not run successfully for $dur_human. No runs since. " . $lb_data->{url} );
+            } elsif ($dur_sec >= $thresh_warn && $thresh_warn && $ls_not_lb && !$building) {
                 response("CRITICAL", "'$jobname' has not run successfully for $dur_human. Runs since failed. " . $lb_data->{url});
+            } elsif ($dur_sec >= $thresh_warn && $thresh_warn && $ls_not_lb && $building) {
+                response("WARNING", "'$jobname' has not run successfully for $dur_human. Job currently running. " . $lb_data->{url});
             } elsif ($dur_sec >= $thresh_warn && $thresh_warn) {
-                response("WARNING", "'$jobname' has not run successfully for $dur_human. No runs since. " . $lb_data->{url})
+                response("WARNING", "'$jobname' has not run successfully for $dur_human. " . ($building ? "Job currently running. " : "No runs since. " ) . $lb_data->{url})
             }
             
-            if ($ls_data->{number} != $lb_data->{number} && $alert_on_fail) {
+            if ($ls_data->{number} != $lb_data->{number} && !$building && $alert_on_fail) {
                 ($dur_sec, $dur_human) = calcdur(int($lb_data->{timestamp} / 1000));
                 response ( "WARNING", "'$jobname' failed $dur_human ago. " . $lb_data->{url} );
             } else {
